@@ -1,4 +1,1 @@
-sessionid = ""
-steamLogin = ""
-steamparental = ""
-sort = ""
+../../settings.txt

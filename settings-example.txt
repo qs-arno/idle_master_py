@@ -1,0 +1,69 @@
+## steamcommunity.com browser cookies
+## If you're using Mozilla Firefox you probably want to leave these blank, set
+## firefoxProfile below, and let Idle Master auto-detect these values.
+sessionid     = ""
+steamLogin    = ""
+steamparental = ""
+
+## Not sure what this is for
+hasPlayTime = "false"
+
+## Firefox profile name
+## This should be something like "abcdefgh.default"
+firefoxProfile = ""
+
+## If you want Idle Master to print a "press a key to continue" prompt and wait
+## for a keypress when it exits, set this to True; if you launch from a GUI
+## that spawns a new terminal specifically for Idle Master, you may want this
+## to keep that window from immediately closing when it exits.
+wantExitPrompt = False
+
+## If you want to display each game's thumbnail art from the Steam store as
+## it's idled, set this to True.
+wantStoreImages = True
+
+## Game idling order
+##
+## TL/DR: If you sell your cards, choose "mostvalue"; otherwise, "leastcards".
+##
+## sort = "mostvalue"
+## This option will tell Idle Master that you would like to idle the games with
+## the highest market value of available cards first, then work down the list
+## until it idles the game with the lowest card market value last.  This is
+## accomplished by using the Enhanced Steam API to pull the average price per
+## card drop of each game you need to idle and multiplying it by the number of
+## available drops.  Because of the additional data requests that this
+## requires, setting this option will cause additional waiting time when the
+## program is first starting up.
+## *** This option is the best way to maximize your profits from idling.
+##
+## sort = "leastcards"
+## Similar to the mostcards option, but in reverse.  Idle Master will begin by
+## idling the game with the least number of cards available first, and then
+## work its way down the list until it idles the game with the highest number
+## of remaining card drops last.
+## *** This option is the best way to maximize the number of games in which
+## *** you're eligible for a booster pack.
+##
+## sort = "mostcards"
+## Idle Master will begin by idling the game which has the highest number of
+## available card drops, and work its way down the list until it idles the game
+## with the least number of available card drops.
+##
+## sort = ""
+## If no sorting preference is set, Idle Master will simply idle your games in
+## the order in which they are displayed on your badge progress page (more or
+## less, this is random).
+##
+## sort = "leastvalue"
+## Similar to the mostvalue option, but in reverse.  This option will tell Idle
+## Master that you would like to start idling the least valuable cards first,
+## and work down the list until you finish by idling the most valuable cards.
+## I'm honestly not sure why you would want to do this, but hey why not, right?
+## Because of the additional data requests that this requires, setting this
+## option will cause additional waiting time when the program is first starting
+## up
+sort = "leastcards"
+
+## EOF
+########
