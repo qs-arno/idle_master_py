@@ -16,50 +16,67 @@ init()
 
 os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
 
-logging.basicConfig(filename="idlemaster.log",filemode="w",format="[ %(asctime)s ] %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p",level=logging.DEBUG)
+logging.basicConfig(filename="idlemaster.log",filemode="w",format="[ %(asctime)s ] [%(name)s] [%(levelname)s] %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p",level=logging.DEBUG)
+logging.addLevelName( logging.CRITICAL, "\033[1;41m%s\033[1;0m" % logging.getLevelName(logging.CRITICAL))
+logging.addLevelName( logging.ERROR,    "\033[1;31m%s\033[1;0m" % logging.getLevelName(logging.ERROR))
+logging.addLevelName( logging.WARNING,  "\033[1;35m%s\033[1;0m" % logging.getLevelName(logging.WARNING))
+logging.addLevelName( logging.DEBUG,    "\033[1;30m%s\033[1;0m" % logging.getLevelName(logging.DEBUG))
 console = logging.StreamHandler()
-console.setLevel(logging.WARNING)
-console.setFormatter(logging.Formatter("[ %(asctime)s ] %(message)s", "%m/%d/%Y %I:%M:%S %p"))
+console.setLevel(logging.INFO)
+console.setFormatter(logging.Formatter("[ %(asctime)s ] [%(name)s] [%(levelname)s] %(message)s", "%m/%d/%Y %I:%M:%S %p"))
 logging.getLogger('').addHandler(console)
+
+## Don't care about urllib3's logspam, set its threshold to WARNING
+my_logger = logging.getLogger('requests.packages.urllib3.connectionpool')
+my_logger.setLevel(logging.WARNING)
 
 if sys.platform.startswith('win32'):
 	ctypes.windll.kernel32.SetConsoleTitleA("Idle Master")
 
-logging.warning(Fore.GREEN + "WELCOME TO IDLE MASTER" + Fore.RESET)
+logging.info("WELCOME TO IDLE MASTER")
 
 try:
 	authData={}
+	authData["sessionid"]=None
+	authData["steamLogin"]=None
 	authData["sort"]=None
 	authData["steamparental"]=None
 	authData["wantExitPrompt"]=True
 	authData["hasPlayTime"]="false"
 	authData["firefoxProfile"]=None
 	execfile("./settings.txt",authData)
-
-	## Read steamcommunity.com cookies from Firefox session store
-	if authData["firefoxProfile"]:
-		logging.warning(Fore.RED + "Reading cookie data from Firefox session store" + Fore.RESET)
-		firefox_session_info=firefox_session.get_session_info_from_firefox(authData["firefoxProfile"])
-		authData['sessionid']=firefox_session_info['sessionid']
-		authData['steamLogin']=firefox_session_info['steamLogin']
-		logging.warning(Fore.RED + "Firefox sessionid: " + authData['sessionid'] + Fore.RESET)
-		logging.warning(Fore.RED + "Firefox steamLogin: " + authData['steamLogin'] + Fore.RESET)
-
-	myProfileURL = "http://steamcommunity.com/profiles/"+authData["steamLogin"][:17]
 except Exception, e:
-	logging.warning(Fore.RED + "Error loading config file: " + e.message + Fore.RESET)
+	logging.critical("Error loading config file: " + e.message)
 	if authData["wantExitPrompt"]:
 		raw_input("Press Enter to continue...")
 	sys.exit()
 	
-if not authData["sessionid"]:
-	logging.warning(Fore.RED + "No sessionid set" + Fore.RESET)
+## Read steamcommunity.com cookies from Firefox session store if we have one
+if authData["firefoxProfile"]:
+    logging.debug("Reading cookie data from Firefox session store")
+    firefox_session_info=firefox_session.get_session_info_from_firefox(authData["firefoxProfile"])
+    if firefox_session_info:
+        authData['sessionid']=firefox_session_info['sessionid']
+        authData['steamLogin']=firefox_session_info['steamLogin']
+
+## Derive profile URI
+myProfileURL = "http://steamcommunity.com/profiles/"+authData["steamLogin"][:17]
+logging.debug("Profile: " + myProfileURL)
+
+## Bail if we don't have a sessionid cookie
+if authData["sessionid"]:
+    logging.debug("Session ID cookie : " + authData['sessionid'])
+else:
+	logging.critical("No sessionid set")
 	if authData["wantExitPrompt"]:
 	    raw_input("Press Enter to continue...")
 	sys.exit()
 	
-if not authData["steamLogin"]:
-	logging.warning(Fore.RED + "No steamLogin set" + Fore.RESET)
+## Bail if we don't have a steamLogin cookie
+if authData["steamLogin"]:
+    logging.debug("Login cookie      : " + authData['steamLogin'])
+else:
+	logging.critical("No steamLogin set")
 	if authData["wantExitPrompt"]:
 		raw_input("Press Enter to continue...")
 	sys.exit()
@@ -69,7 +86,7 @@ def generateCookies():
 	try:
 		cookies = dict(sessionid=authData["sessionid"], steamLogin=authData["steamLogin"], steamparental=authData["steamparental"])
 	except:
-		logging.warning(Fore.RED + "Error setting cookies" + Fore.RESET)
+		logging.critical("Error setting cookies")
 		if authData["wantExitPrompt"]:
 		    raw_input("Press Enter to continue...")
 		sys.exit()
@@ -85,7 +102,7 @@ def dropDelay(numDrops):
 	
 def idleOpen(appID):
 	try:
-		logging.warning("Starting game " + getAppName(appID) + " to idle cards")
+		logging.info("Starting game " + getAppName(appID) + " to idle cards")
 		global process_idle
 		global idle_time
 
@@ -98,19 +115,19 @@ def idleOpen(appID):
 		elif sys.platform.startswith('linux'):
 			process_idle = subprocess.Popen(["python2", "steam-idle.py", str(appID)])
 	except:
-		logging.warning(Fore.RED + "Error launching steam-idle with game ID " + str(appID) + Fore.RESET)
+		logging.critical("Error launching steam-idle with game ID " + str(appID))
 		if authData["wantExitPrompt"]:
 		    raw_input("Press Enter to continue...")
 		sys.exit()
 
 def idleClose(appID):
 	try:
-		logging.warning("Closing game " + getAppName(appID))
+		logging.info("Closing game " + getAppName(appID))
 		process_idle.terminate()
 		total_time = int(time.time() - idle_time)
-		logging.warning(getAppName(appID) + " took " + Fore.GREEN + str(datetime.timedelta(seconds=total_time)) + Fore.RESET + " to idle.")
+		logging.info(getAppName(appID) + " took " + Fore.GREEN + str(datetime.timedelta(seconds=total_time)) + Fore.RESET + " to idle.")
 	except:
-		logging.warning(Fore.RED + "Error closing game. Exiting." + Fore.RESET)
+		logging.critical("Error closing game. Exiting.")
 		if authData["wantExitPrompt"]:
 		    raw_input("Press Enter to continue...")
 		sys.exit()
@@ -120,7 +137,7 @@ def chillOut(appID):
 	idleClose(appID)
 	stillDown = True
 	while stillDown:
-		logging.warning("Sleeping for 5 minutes.")
+		logging.info("Sleeping for 5 minutes.")
 		time.sleep(5*60)
 		try:
 			rBadge = requests.get(myProfileURL+"/gamecards/" + str(appID) + "/",cookies=cookies)
@@ -129,7 +146,7 @@ def chillOut(appID):
 			if "card drops" in badgeLeftString:
 				stillDown = False
 		except:
-			logging.warning("Still unable to find drop info.")
+			logging.info("Still unable to find drop info.")
 	# Resume operations.
 	idleOpen(appID)
 	
@@ -158,27 +175,27 @@ def get_blacklist():
 		blacklist = [];
 
 	if not blacklist:
-		logging.warning("No games have been blacklisted")
+		logging.debug("No games have been blacklisted")
 
 	return blacklist
 
-logging.warning("Finding games that have card drops remaining")
+logging.info("Finding games that have card drops remaining")
 
 try:
 	cookies = generateCookies()
 	r = requests.get(myProfileURL+"/badges/",cookies=cookies)
 except:
-	logging.warning(Fore.RED + "Error reading badge page" + Fore.RESET)
+	logging.critical("Error reading badge page")
 	if authData["wantExitPrompt"]:
 		raw_input("Press Enter to continue...")
 	sys.exit()
 
 try:
 	badgesLeft = []
-	badgePageData = bs4.BeautifulSoup(r.text)
+	badgePageData = bs4.BeautifulSoup(r.text, "lxml")
 	badgeSet = badgePageData.find_all("div",{"class": "badge_title_stats"})
 except:
-	logging.warning(Fore.RED + "Error finding drop info" + Fore.RESET)
+	logging.critical("Error finding drop info")
 	if authData["wantExitPrompt"]:
 		raw_input("Press Enter to continue...")
 	sys.exit()
@@ -187,19 +204,19 @@ except:
 try:
 	badgePages = int(badgePageData.find_all("a",{"class": "pagelink"})[-1].text)
 	if badgePages:
-		logging.warning(str(badgePages) + " badge pages found.  Gathering additional data")
+		logging.info(str(badgePages) + " badge pages found.  Gathering additional data")
 		currentpage = 2
 		while currentpage <= badgePages:
 			r = requests.get(myProfileURL+"/badges/?p="+str(currentpage),cookies=cookies)
-			badgePageData = bs4.BeautifulSoup(r.text)
+			badgePageData = bs4.BeautifulSoup(r.text, "lxml")
 			badgeSet = badgeSet + badgePageData.find_all("div",{"class": "badge_title_stats"})
 			currentpage = currentpage + 1
-except:
-	logging.warning("Reading badge page, please wait")
+except Exception, e:
+	logging.warning("Error reading badge page: " + e.message)
 
 userinfo = badgePageData.find("a",{"class": "user_avatar"})
 if not userinfo:
-	logging.warning(Fore.RED + "Invalid cookie data, cannot log in to Steam" + Fore.RESET)
+	logging.critical("Invalid cookie data, cannot log in to Steam")
 	if authData["wantExitPrompt"]:
 		raw_input("Press Enter to continue...")
 	sys.exit()
@@ -207,7 +224,7 @@ if not userinfo:
 blacklist = get_blacklist()
 
 if authData["sort"]=="mostvalue" or authData["sort"]=="leastvalue":
-	logging.warning("Getting card values, please wait...")
+	logging.debug("Getting card values")
 
 for badge in badgeSet:
 
@@ -229,7 +246,7 @@ for badge in badgeSet:
 				logging.warning(getAppName(badgeId) + " on blacklist, skipping game")
 				continue
 			else:
-				logging.warning("Need to idle: [" + str(badgeId) + "] " + Fore.GREEN + getAppName(badgeId) + Fore.RESET)
+				logging.info("Need to idle: [" + str(badgeId) + "] " + Fore.GREEN + getAppName(badgeId) + Fore.RESET)
 				if authData["sort"]=="mostvalue" or authData["sort"]=="leastvalue":
 					gameValue = requests.get("http://api.enhancedsteam.com/market_data/average_card_price/?appid=" + str(badgeId) + "&cur=usd")
 					push = [badgeId, dropCountInt, float(str(gameValue.text))]
@@ -240,7 +257,7 @@ for badge in badgeSet:
 	except:
 		continue
 
-logging.warning("Idle Master needs to idle " + Fore.GREEN + str(len(badgesLeft)) + Fore.RESET + " games")
+logging.info("Idle Master needs to idle " + Fore.GREEN + str(len(badgesLeft)) + Fore.RESET + " games")
 
 def getKey(item):
 	if authData["sort"]=="mostcards" or authData["sort"]=="leastcards":
@@ -259,7 +276,7 @@ if authData["sort"] in sortValues:
 	if authData["sort"]=="leastcards" or authData["sort"]=="leastvalue":
 		games = sorted(badgesLeft, key=getKey, reverse=False)
 else:
-	logging.warning(Fore.RED + "Invalid sort value" + Fore.RESET)
+	logging.critical("Invalid sort value")
 	if authData["wantExitPrompt"]:
 		raw_input("Press Enter to continue...")
 	sys.exit()
@@ -272,25 +289,25 @@ for appID, drops, value in games:
 	
 	idleOpen(appID)
 
-	logging.warning(getAppName(appID) + " has " + str(drops) + " card drops remaining")
+	logging.info(getAppName(appID) + " has " + str(drops) + " card drops remaining")
 
 	if sys.platform.startswith('win32'):
 		ctypes.windll.kernel32.SetConsoleTitleA("Idle Master - Idling " + getPlainAppName(appID) + " [" + str(drops) + " remaining]")
 
 	while stillHaveDrops==1:
 		try:
-			logging.warning("Sleeping for " + str(delay / 60) + " minutes")
+			logging.info("Sleeping for " + str(delay / 60) + " minutes")
 			time.sleep(delay)
 			numCycles-=1
 			if numCycles<1: # Sanity check against infinite loop
 				stillHaveDrops=0
 
-			logging.warning("Checking to see if " + getAppName(appID) + " has remaining card drops")
+			logging.info("Checking to see if " + getAppName(appID) + " has remaining card drops")
 			rBadge = requests.get(myProfileURL + "/gamecards/" + str(appID) + "/",cookies=cookies)
-			indBadgeData = bs4.BeautifulSoup(rBadge.text)
+			indBadgeData = bs4.BeautifulSoup(rBadge.text, "lxml")
 			badgeLeftString = indBadgeData.find_all("span",{"class": "progress_info_bold"})[0].contents[0]
 			if "No card drops" in badgeLeftString:
-				logging.warning("No card drops remaining")
+				logging.info("No card drops remaining")
 				stillHaveDrops=0
 			else:
 				dropCountInt, junk = badgeLeftString.split(" ",1)
@@ -310,8 +327,8 @@ for appID, drops, value in games:
 				break
 
 	idleClose(appID)
-	logging.warning(Fore.GREEN + "Successfully completed idling cards for " + getAppName(appID) + Fore.RESET)
+	logging.info("Successfully completed idling cards for " + getAppName(appID))
 
-logging.warning(Fore.GREEN + "Successfully completed idling process" + Fore.RESET)
+logging.debug("Successfully completed idling process")
 if authData["wantExitPrompt"]:
 	raw_input("Press Enter to continue...")
